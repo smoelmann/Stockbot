@@ -62,7 +62,7 @@ class Stock():
         """
         """
         if avg == None:
-            self.data.plot(x="Date",y="Close",grid=True)
+            self.data.plot(x=self.data.index,y="Close",grid=True,ylim=(max(self.data["Close"]*1.1),min(self.data["Close"])*0.9))
         else:
             self.data.plot(x=self.data.index,y=avg,grid=True,ylim=(max(self.data["Close"]*1.1),min(self.data["Close"])*0.9))
         plt.gca().invert_yaxis()
@@ -137,10 +137,10 @@ class Stock():
             x = self.data.loc[idx, col_x]
             y = self.data.loc[idx, col_y]
             if (c < x) and (x > y):
-                # print("Date: {d} (idx={i}), C: {c}, X: {x}, Y: {y}".format(d=self.data.loc[idx, "Date"], i=idx, c=c, x=x, y=y))
-                return idx
+                print("Date: {d} (idx={i}), C: {c}, X: {x}, Y: {y}".format(d=self.data.loc[idx, "Date"], i=idx, c=c, x=x, y=y))
+                # return idx
 
-def simulate_market(stock, start_money, avg=(2,10)):
+def simulate_market(stock, start_money, avg=(2,10), lst=None):
     """ avg  - the lowest and highest averages to be examined
     """
     start, end = avg
@@ -154,24 +154,17 @@ def simulate_market(stock, start_money, avg=(2,10)):
         if not (col_x in stock.data.columns):
             stock.get_avg(x)
 
-    # Variables to contain max and min results
+    # Variables to contain logging results
     max_money = 0
     max_avg = (0,0)
-    min_money = np.inf
-    min_avg = (0,0)
-    min_num_purchases = 0
     max_num_purchases = 0
-    max_trades = 0
-    max_t = 0
-    max_t_xy = (0,0)
 
-    # Loop across averages and find the optimal intervals, only use y where y>x
+    # Loop across averages and find the optimal intervals, only use y where y > x + 1
     print("Calculating optimmal avgerages...")
     for x in range(start, end):
         col_x = "avg_{x}".format(x=x)
-        gen = (y for y in range(start + 1, end + 1) if y > x)
+        gen = (y for y in range(start + 1, end + 1) if y > x + 1)
         for y in gen:
-        # for y in range(start + 1, end + 1):
             # Simulate buying and selling for x- and y-avg
             # Initializing variables
             money = start_money
@@ -190,7 +183,8 @@ def simulate_market(stock, start_money, avg=(2,10)):
                 # Looking to buy
                 if mode == "buy":
                     # Buy signal
-                    if (price > y) and (x < y):
+                    if (price > avg_y) and (avg_x < avg_y):
+                        print("BUY: {idx}  {p}".format(idx=idx, p=price))
                         mode = "sell"
                         num_bought = money / price
                         money = 0
@@ -199,7 +193,8 @@ def simulate_market(stock, start_money, avg=(2,10)):
                 # Looking to sell
                 if mode == "sell":
                     # Sell signal
-                    if (price < x) and (x > y):
+                    if (price < avg_x) and (avg_x > avg_y):
+                        print("SELL: {idx}  {p}".format(idx=idx, p=price))
                         mode = "buy"
                         money = num_bought * price
                         num_bought = 0
@@ -210,44 +205,36 @@ def simulate_market(stock, start_money, avg=(2,10)):
             # Finally sell all to see profit
             money = num_bought * price
 
-            # # Printing result of x-, y-avg
-            # print("Avg: {x}  {y}\nGross: {profit}  ({diff})".format(x=x, y=y, profit=money/start_money, diff=money-start_money))
+            # Printing result of x-, y-avg
+            print("Avg: {x}  {y}  {t}\nGross: {profit}  ({diff})\n\n\n".format(x=x, y=y, t=num_purchases, profit=round(money/start_money,3), diff=round(money-start_money,3)))
+
             # Logging max and min values
             if money >= max_money and num_purchases > 1:
                 max_money = money
                 max_avg = (x, y)
                 max_num_purchases = num_purchases
-            if money <= min_money and num_purchases > 1:
-                min_money = money
-                min_avg = (x, y)
-                min_num_purchases = num_purchases
-            if num_purchases >= max_trades:
-                max_trades = num_purchases
-                max_t = money
-                max_t_xy = (x, y)
 
+    # Print logs
     maxx, maxy = max_avg
-    minx, miny = min_avg
-    tx, ty = max_t_xy
-    print("MAX:: {p}%  ({x}, {y}). Num {n}".format(p=max_money/start_money*100-100, x=maxx, y=maxy, n=max_num_purchases))
-    print("MIN:: {p}%  ({x}, {y}). Num {n}".format(p=min_money/start_money*100-100, x=minx, y=miny, n=min_num_purchases))
-    print("TRD:: {p}%  ({x}, {y}). Num {n}".format(p=max_t/start_money*100-100, x=tx, y=ty, n=max_trades))
+    print("MAX:: {p}%  ({x}, {y}). Num {n}".format(p=round(max_money/start_money*100,3), x=maxx, y=maxy, n=max_num_purchases))
 # End simulate_market method
 
 
 if __name__ == "__main__":
     print("Getting data...")
-    test_stock = Stock("AMZN")
-    test_stock.get_avg(33)
-    test_stock.get_avg(34)
+    test_stock = Stock("GSF.OL")
+    test_stock.get_avg(7)
+    test_stock.get_avg(25)
     # test_stock.view_data()
-    # test_stock.splot()
-    # test_stock.rule_buy(33, 34)
-    # test_stock.rule_sell(15, 50)
-    # test_stock.splot(["Close","avg_16", "avg_17"])
+    print("BUY")
+    test_stock.rule_buy(45, 48)
+    print("SELL")
+    test_stock.rule_sell(45, 48)
 
-    simulate_market(test_stock, 10000, (2,50))
-    test_stock.splot(["Close","avg_33", "avg_34"])
+    # simulate_market(test_stock, 10000, (5,50))
+    # test_stock.splot(["Close", "avg_5", "avg_15"])
+    test_stock.splot(["Close", "avg_7", "avg_25"])
+
 
 
 
